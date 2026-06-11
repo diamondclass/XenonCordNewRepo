@@ -51,8 +51,18 @@ public class AntiProxyModule extends ModuleBase {
                     }
                     getLogger().info(Colorize.console(String.format("&6Fetched &c%s &aTotal: &4%d", s, fetchList.size())));
                 }).exceptionally(throwable -> {
-                    if (throwable.getCause() instanceof java.io.FileNotFoundException || throwable instanceof java.io.FileNotFoundException) {
-                        getLogger().info(Colorize.console(String.format("&cLink not found: %s", s)));
+                    Throwable cause = throwable;
+                    boolean isFileNotFound = false;
+                    while (cause != null) {
+                        if (cause instanceof java.io.FileNotFoundException) {
+                            isFileNotFound = true;
+                            break;
+                        }
+                        cause = cause.getCause();
+                    }
+                    
+                    if (isFileNotFound) {
+                        getLogger().info(Colorize.console(String.format("&cLink not found (404): %s", s)));
                     } else {
                         getLogger().error(Colorize.console(String.format("&cFailed to fetch proxies from %s: %s", s, throwable.getMessage())));
                     }

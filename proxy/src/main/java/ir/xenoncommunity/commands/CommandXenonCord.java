@@ -2,21 +2,15 @@ package ir.xenoncommunity.commands;
 
 import ir.xenoncommunity.utils.Language;
 import net.md_5.bungee.api.chat.TextComponent;
-import ir.xenoncommunity.utils.Language;
-import net.md_5.bungee.api.chat.TextComponent;
 import ir.xenoncommunity.XenonCore;
 import ir.xenoncommunity.utils.Message;
 import ir.xenoncommunity.module.impl.gui.GuiModule;
 import ir.xenoncommunity.module.impl.security.BlacklistModule;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.plugin.Command;
-import java.util.HashSet;
-import java.util.Set;
 
 @SuppressWarnings("unused")
 public class CommandXenonCord extends Command {
-    public static final Set<String> ABstatusPlayers = new HashSet<>();
-    public boolean log = false;
 
     public CommandXenonCord() {
         super("xenoncord", XenonCore.instance.getConfigData().getXenoncord_permission());

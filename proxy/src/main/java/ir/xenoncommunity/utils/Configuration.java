@@ -5,7 +5,9 @@ import lombok.Cleanup;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.logging.log4j.Logger;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -43,7 +45,11 @@ public class Configuration {
             Thread.currentThread().setContextClassLoader(ConfigData.class.getClassLoader());
 
             @Cleanup final FileInputStream is = new FileInputStream(configFile);
-            final ConfigData configData = new Yaml().loadAs(is, ConfigData.class);
+            LoaderOptions loaderOptions = new LoaderOptions();
+            loaderOptions.setAllowDuplicateKeys(false);
+            Constructor constructor = new Constructor(ConfigData.class, loaderOptions);
+            constructor.getPropertyUtils().setSkipMissingProperties(true);
+            final ConfigData configData = new Yaml(constructor).loadAs(is, ConfigData.class);
 
             // Translate colors
 

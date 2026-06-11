@@ -56,9 +56,10 @@ public class CaptchaModule extends ModuleBase implements Listener {
         if (WhitelistUtils.isWhitelisted(player.getAddress().getAddress().getHostAddress(), player.getName())) return;
         if (isVerified(player.getUniqueId())) return;
 
-        sessions.put(player.getUniqueId(), new CaptchaSession(player));
+        CaptchaSession session = new CaptchaSession(player);
+        sessions.put(player.getUniqueId(), session);
         injectNetty(player);
-        showCaptcha(player);
+        startPreVerify(player);
     }
 
     @EventHandler(priority = -64)
@@ -86,8 +87,9 @@ public class CaptchaModule extends ModuleBase implements Listener {
                 } else {
                     handleFailure(player);
                 }
-            } else {
-                player.sendMessage(ChatColor.RED + "Please wait... verifying connection.");
+            } else if (session.state == State.PRE_VERIFY) {
+                player.sendMessage(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+                    ChatColor.RED + "Please wait... verifying connection."));
             }
         }
     }
@@ -102,6 +104,46 @@ public class CaptchaModule extends ModuleBase implements Listener {
         if (session != null && session.task != null) {
             session.task.cancel(true);
         }
+    }
+
+    private void startPreVerify(ProxiedPlayer player) {
+        CaptchaSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+
+        int duration = getConfig().getModules().getCaptcha_module().getPre_verify_duration();
+        int maxPing = getConfig().getModules().getCaptcha_module().getMax_ping();
+
+        if (duration <= 0) {
+            showCaptcha(player);
+            return;
+        }
+
+        session.state = State.PRE_VERIFY;
+        String msg = getConfig().getModules().getCaptcha_module().getMessages().getPre_verify()
+                .replace("%time%", String.valueOf(duration));
+        sendMessage(player, ChatColor.translateAlternateColorCodes('&', msg));
+
+        session.task = getTaskManager().repeatingTask(() -> {
+            if (!player.isConnected()) return;
+
+            session.elapsed++;
+            if (session.elapsed >= duration) {
+                session.task.cancel(true);
+                session.elapsed = 0; // reset for captcha timeout
+                int currentPing = player.getPing();
+
+                if (maxPing > 0 && currentPing > maxPing) {
+                    String kickMsg = getConfig().getModules().getCaptcha_module().getMessages().getPing_too_high()
+                            .replace("%ping%", String.valueOf(currentPing))
+                            .replace("%max%", String.valueOf(maxPing));
+                    player.disconnect(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+                            ChatColor.translateAlternateColorCodes('&', kickMsg)));
+                    sessions.remove(player.getUniqueId());
+                } else {
+                    showCaptcha(player);
+                }
+            }
+        }, 1, 1, TimeUnit.SECONDS);
     }
 
     private void showCaptcha(ProxiedPlayer player) {
@@ -244,6 +286,9 @@ public class CaptchaModule extends ModuleBase implements Listener {
                                             handleFailure(player);
                                         }
                                     });
+                                } else if (session.state == State.PRE_VERIFY) {
+                                    player.sendMessage(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+                                        ChatColor.RED + "Please wait... verifying connection."));
                                 }
                                 return;
                             } else {
@@ -448,6 +493,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
     }
 
     private enum State {
+        PRE_VERIFY,
         CAPTCHA
     }
 

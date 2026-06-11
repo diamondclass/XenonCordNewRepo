@@ -1,9 +1,9 @@
 package ir.xenoncommunity.module.impl.security;
 
-import ir.xenoncommunity.XenonCore;
 import ir.xenoncommunity.annotations.ModuleInfo;
 import ir.xenoncommunity.module.ModuleBase;
 import ir.xenoncommunity.utils.BlacklistManager;
+import ir.xenoncommunity.utils.Configuration;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.event.PreLoginEvent;
 import net.md_5.bungee.event.EventHandler;
@@ -16,7 +16,8 @@ public class BlacklistModule extends ModuleBase {
 
     @Override
     public void onInit() {
-        if (!getConfig().getModules().getCaptcha_module().isEnabled()) {
+        final Configuration.BlacklistModuleConfig cfg = getConfig().getModules().getBlacklist_module();
+        if (cfg == null || !cfg.isEnabled()) {
             return;
         }
         instance = this;
@@ -32,11 +33,10 @@ public class BlacklistModule extends ModuleBase {
     public void onPreLogin(PreLoginEvent event) {
         if (event.isCancelled()) return;
 
-        String ip = event.getConnection().getAddress().getAddress().getHostAddress();
+        final String ip = event.getConnection().getAddress().getAddress().getHostAddress();
         if (blacklistManager.isBlacklisted(ip)) {
-            event.setCancelReason(TextComponent.fromLegacyText(
-                    getConfig().getModules().getCaptcha_module().getBlacklist_message()
-            ));
+            final Configuration.BlacklistModuleConfig cfg = getConfig().getModules().getBlacklist_module();
+            event.setCancelReason(TextComponent.fromLegacyText(cfg.getKick_message()));
             event.setCancelled(true);
         }
     }

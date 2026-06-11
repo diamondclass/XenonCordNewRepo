@@ -101,7 +101,11 @@ modules:
     max_accounts: 3
     kick_message: "&b&lXenonCord &cYou have reached the maximum accounts per IP limit (%limit%)."
 
-  # CAPTCHA SYSTEM
+  # BLOCKS CONNECTIONS FROM BLACKLISTED IPs (penalized by captcha failures)
+  blacklist_module:
+    enabled: true
+    kick_message: "&b&lXenonCord &cYou have been blacklisted for failing captcha many times."
+
   captcha_module:
     enabled: true
     # Duration in hours players remain verified (e.g., 24)
@@ -116,7 +120,8 @@ modules:
     blacklist_threshold: 5
     # Blacklist duration in hours
     blacklist_duration: 72
-    blacklist_message: "&b&lXenonCord &cYou have been blacklisted for failing the captcha too many times."
+    # Seconds an idle player has to solve the captcha before being disconnected (0 = disabled)
+    session_timeout: 60
     messages:
       pre_verify: "&b&lXenonCord &fVerifying connection... Please wait &b%time%s&f."
       ping_too_high: "&b&lXenonCord &cYour ping is too high (&b%ping%ms&c). Maximum allowed: &b%max%ms&c."

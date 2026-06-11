@@ -29,7 +29,6 @@ import java.lang.reflect.Method;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -60,14 +59,13 @@ public class CaptchaModule extends ModuleBase implements Listener {
         sessions.put(player.getUniqueId(), new CaptchaSession(player));
         injectNetty(player);
         showCaptcha(player);
-        
     }
 
     @EventHandler(priority = -64)
     public void onServerConnect(ServerConnectEvent event) {
         ProxiedPlayer player = event.getPlayer();
         CaptchaSession session = sessions.get(player.getUniqueId());
-        
+
         if (session != null && !session.verified) {
             event.setCancelled(true);
         }
@@ -78,7 +76,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
         if (!(event.getSender() instanceof ProxiedPlayer)) return;
         ProxiedPlayer player = (ProxiedPlayer) event.getSender();
         CaptchaSession session = sessions.get(player.getUniqueId());
-        
+
         if (session != null) {
             event.setCancelled(true);
             if (session.state == State.CAPTCHA) {
@@ -120,7 +118,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
         login.setGameMode((short) 2);
         login.setPreviousGameMode((short) -1);
         login.setWorldNames(Collections.singleton("minecraft:the_nether"));
-        
+
         int version = player.getPendingConnection().getVersion();
         if (version >= ProtocolConstants.MINECRAFT_1_16) {
             login.setDimension("minecraft:the_nether");
@@ -134,7 +132,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
         login.setLevelType("default");
         login.setViewDistance(2);
         login.setSimulationDistance(2);
-        
+
         BYPASS.set(true);
         try {
             player.unsafe().sendPacket(login);
@@ -160,16 +158,28 @@ public class CaptchaModule extends ModuleBase implements Listener {
         net.md_5.bungee.protocol.packet.Item item = new net.md_5.bungee.protocol.packet.Item();
         item.setId(358);
         item.setCount(1);
-        item.setData(0); 
-        
+        item.setData(0);
+
         sendPacket(player, new net.md_5.bungee.protocol.packet.SetSlot(0, 36, item));
-        
-        sendMessage(player, ChatColor.translateAlternateColorCodes('&', 
+
+        sendMessage(player, ChatColor.translateAlternateColorCodes('&',
             getConfig().getModules().getCaptcha_module().getMessages().getInstructions()));
 
+        final int timeoutSeconds = getConfig().getModules().getCaptcha_module().getSession_timeout();
+
         session.task = getTaskManager().repeatingTask(() -> {
-            if (player.isConnected()) {
-                sendPacket(player, new KeepAlive(System.currentTimeMillis()));
+            if (!player.isConnected()) return;
+
+            sendPacket(player, new KeepAlive(System.currentTimeMillis()));
+
+            if (timeoutSeconds > 0) {
+                session.elapsed++;
+                if (session.elapsed >= timeoutSeconds) {
+                    player.disconnect(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+                        ChatColor.translateAlternateColorCodes('&',
+                            getConfig().getModules().getCaptcha_module().getMessages().getToo_many_attempts())));
+                    sessions.remove(player.getUniqueId());
+                }
             }
         }, 1, 1, TimeUnit.SECONDS);
     }
@@ -197,11 +207,11 @@ public class CaptchaModule extends ModuleBase implements Listener {
             Method getChMethod = player.getClass().getDeclaredMethod("getCh");
             getChMethod.setAccessible(true);
             Object channelWrapper = getChMethod.invoke(player);
-            
+
             Method getHandleMethod = channelWrapper.getClass().getDeclaredMethod("getHandle");
             getHandleMethod.setAccessible(true);
             Channel channel = (Channel) getHandleMethod.invoke(channelWrapper);
-            
+
             if (channel.pipeline().get("captcha-handler") != null) {
                 channel.pipeline().remove("captcha-handler");
             }
@@ -260,7 +270,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
 
                         if (packet != null) {
                             String className = packet.getClass().getSimpleName();
-                            if (className.contains("Chat") || className.contains("Title") || 
+                            if (className.contains("Chat") || className.contains("Title") ||
                                 className.contains("PlayerList") || className.contains("BossBar")) {
                                 return;
                             }
@@ -277,15 +287,17 @@ public class CaptchaModule extends ModuleBase implements Listener {
         if (session == null) return;
 
         session.verified = true;
-        
-        long expiry = System.currentTimeMillis() + (TimeUnit.HOURS.toMillis(getConfig().getModules().getCaptcha_module().getVerification_duration()));
+
+        long expiry = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(
+            getConfig().getModules().getCaptcha_module().getVerification_duration());
         verifiedPlayers.put(player.getUniqueId(), expiry);
         saveVerifiedPlayer(player.getUniqueId(), expiry);
-        
+
         cleanupSession(player.getUniqueId());
 
-        player.disconnect(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&', 
-            getConfig().getModules().getCaptcha_module().getMessages().getSuccess())));
+        player.disconnect(net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+            ChatColor.translateAlternateColorCodes('&',
+                getConfig().getModules().getCaptcha_module().getMessages().getSuccess())));
     }
 
     private void handleFailure(ProxiedPlayer player) {
@@ -293,26 +305,30 @@ public class CaptchaModule extends ModuleBase implements Listener {
         if (session == null) return;
 
         session.attempts++;
-        int maxAttempts = 3;
-        int blacklistThreshold = getConfig().getModules().getCaptcha_module().getBlacklist_threshold();
-        
+        final int maxAttempts = 3;
+        final int blacklistThreshold = getConfig().getModules().getCaptcha_module().getBlacklist_threshold();
+
         if (session.attempts >= blacklistThreshold) {
             if (BlacklistModule.instance != null) {
                 int duration = getConfig().getModules().getCaptcha_module().getBlacklist_duration();
-                BlacklistModule.instance.getBlacklistManager().add(player.getAddress().getAddress().getHostAddress(), duration);
+                BlacklistModule.instance.getBlacklistManager().add(
+                    player.getAddress().getAddress().getHostAddress(), duration);
             }
-            player.disconnect(ChatColor.translateAlternateColorCodes('&', 
-                getConfig().getModules().getCaptcha_module().getBlacklist_message()));
+            final Configuration.BlacklistModuleConfig blacklistCfg = getConfig().getModules().getBlacklist_module();
+            final String msg = blacklistCfg != null
+                ? blacklistCfg.getKick_message()
+                : ChatColor.RED + "You have been blacklisted.";
+            player.disconnect(ChatColor.translateAlternateColorCodes('&', msg));
             sessions.remove(player.getUniqueId());
             return;
         }
 
         if (session.attempts >= maxAttempts) {
-            player.disconnect(ChatColor.translateAlternateColorCodes('&', 
+            player.disconnect(ChatColor.translateAlternateColorCodes('&',
                 getConfig().getModules().getCaptcha_module().getMessages().getToo_many_attempts()));
             sessions.remove(player.getUniqueId());
         } else {
-            sendMessage(player, ChatColor.translateAlternateColorCodes('&', 
+            sendMessage(player, ChatColor.translateAlternateColorCodes('&',
                 getConfig().getModules().getCaptcha_module().getMessages().getInvalid_code()
                 .replace("%attempts%", String.valueOf(maxAttempts - session.attempts))));
         }
@@ -331,10 +347,10 @@ public class CaptchaModule extends ModuleBase implements Listener {
     private byte[] generateMapData(String code) {
         BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();
-        
+
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, 128, 128);
-        
+
         Random random = new Random();
         int difficulty = getConfig().getModules().getCaptcha_module().getDifficulty();
         g.setColor(Color.LIGHT_GRAY);
@@ -344,11 +360,11 @@ public class CaptchaModule extends ModuleBase implements Listener {
 
         g.setFont(new Font("Arial", Font.BOLD, 24));
         g.setColor(Color.BLACK);
-        
+
         FontMetrics fm = g.getFontMetrics();
         int x = (128 - fm.stringWidth(code)) / 2;
         int y = (128 - fm.getHeight()) / 2 + fm.getAscent();
-        
+
         char[] chars = code.toCharArray();
         int currentX = x;
         for (char c : chars) {
@@ -387,13 +403,11 @@ public class CaptchaModule extends ModuleBase implements Listener {
                     String[] parts = line.split(",");
                     if (parts.length == 2) {
                         try {
-                            // Migrate valid entries
                             verifiedPlayers.put(UUID.fromString(parts[0]), Long.parseLong(parts[1]));
                             saveVerifiedPlayer(UUID.fromString(parts[0]), Long.parseLong(parts[1]));
                         } catch (Exception ignored) {}
                     }
                 }
-                reader.close();
                 oldVerifiedFile.delete();
             } catch (Exception e) {
                 XenonCore.instance.logdebugerror("Failed to migrate old verified players: " + e.getMessage());
@@ -406,7 +420,9 @@ public class CaptchaModule extends ModuleBase implements Listener {
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
                 if (parts.length == 2) {
-                    verifiedPlayers.put(UUID.fromString(parts[0]), Long.parseLong(parts[1]));
+                    try {
+                        verifiedPlayers.put(UUID.fromString(parts[0]), Long.parseLong(parts[1]));
+                    } catch (Exception ignored) {}
                 }
             }
         } catch (Exception e) {

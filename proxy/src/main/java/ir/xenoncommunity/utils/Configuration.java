@@ -61,7 +61,10 @@ public class Configuration {
             captcha.getMessages().setInvalid_code(Message.translateColor(captcha.getMessages().getInvalid_code()));
             captcha.getMessages().setToo_many_attempts(Message.translateColor(captcha.getMessages().getToo_many_attempts()));
 
-            captcha.setBlacklist_message(Message.translateColor(captcha.getBlacklist_message()));
+            BlacklistModuleConfig blacklist = configData.getModules().getBlacklist_module();
+            if (blacklist != null) {
+                blacklist.setKick_message(Message.translateColor(blacklist.getKick_message()));
+            }
             
             logger.info("Successfully Initialized!");
 
@@ -134,8 +137,8 @@ public class Configuration {
         private BrandModule brand_module;
         private AntiProxyModule anti_proxy_module;
         private AccountLimit account_limit_module;
+        private BlacklistModuleConfig blacklist_module;
         private Captcha captcha_module;
-        
     }
 
     @Getter
@@ -178,6 +181,13 @@ public class Configuration {
 
     @Getter
     @Setter
+    public static class BlacklistModuleConfig {
+        private boolean enabled;
+        private String kick_message;
+    }
+
+    @Getter
+    @Setter
     public static class Captcha {
         private boolean enabled;
         private int verification_duration;
@@ -186,7 +196,7 @@ public class Configuration {
         private int difficulty;
         private int blacklist_threshold;
         private int blacklist_duration;
-        private String blacklist_message;
+        private int session_timeout;
         private CaptchaMessages messages;
     }
 

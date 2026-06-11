@@ -390,6 +390,7 @@ public class CaptchaModule extends ModuleBase implements Listener {
     }
 
     private byte[] generateMapData(String code) {
+        System.setProperty("java.awt.headless", "true");
         BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();
 

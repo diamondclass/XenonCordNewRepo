@@ -9,6 +9,10 @@ public class WhitelistUtils {
             return false;
         }
         Configuration.Whitelist whitelist = config.getGeneral().getWhitelist();
+        if ((whitelist.getIps() == null || whitelist.getIps().length == 0) && 
+            (whitelist.getUsers() == null || whitelist.getUsers().length == 0)) {
+            return false;
+        }
         if (ip != null && whitelist.getIps() != null) {
             String cleanIp = ip.trim();
             for (String whitelistedIp : whitelist.getIps()) {

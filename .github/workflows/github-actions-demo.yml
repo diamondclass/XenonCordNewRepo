@@ -58,18 +58,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn -B package --file pom.xml -DskipTests --no-transfer-progress
+      - name: Build with script
+        run: ./build.sh
 
       - name: List target directory
-        run: ls -al bootstrap/target
+        run: ls -al test_run/
 
       - name: Check for XenonCord.jar
         id: check_jar
         run: |
-          if [ -f "bootstrap/target/XenonCord.jar" ]; then
+          if [ -f "test_run/XenonCord.jar" ]; then
             echo "XenonCord.jar found."
-            echo "JAR_FILE_PATH=bootstrap/target/XenonCord.jar" >> $GITHUB_ENV
+            echo "JAR_FILE_PATH=test_run/XenonCord.jar" >> $GITHUB_ENV
             echo "JAR_FILE_NAME=XenonCord.jar" >> $GITHUB_ENV
           else
             echo "XenonCord.jar not found!"

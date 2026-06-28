@@ -43,3 +43,6 @@ manifest.mf
 .vscode
 test_run/
 XenonCord.jar
+native/libdeflate
+native/zlib
+native/mbedtls
